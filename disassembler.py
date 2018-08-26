@@ -95,6 +95,8 @@ arg = {
         0xF5: 1,
         0xF6: 1,
         0xF7: 1,
+        0xF9: 1,
+        0xFA: 1,
 }
 
 bytes_read = open(sys.argv[1], "rb").read()
