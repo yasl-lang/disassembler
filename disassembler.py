@@ -85,6 +85,7 @@ bc = {
 arg = {
         0x02: 8,
         0x0A: 8,
+        0x12: 8,
         0x91: 8,
         0x93: 8,
         0x95: 8,
@@ -98,8 +99,11 @@ arg = {
         0xF9: 1,
         0xFA: 1,
 }
+cp = []
 
 bytes_read = open(sys.argv[1], "rb").read()
+header_bytes = []
+main_bytes = []
 
 def print_byte(i, b, color=RED):
     b = hex(b).lstrip('0x')
@@ -107,37 +111,75 @@ def print_byte(i, b, color=RED):
         b = '0' + b
     b = color + '  ' + b + END
     if i % 16 == 15:
-        print(b)
+        return b + '\n'
     else:
-        print(b, end=' ')
+        return b + ' '
+
+def print_char(i, b, color=GRN):
+    b = "'" + chr(b) + "'"
+    while len(b) < 4:
+        b = ' ' + b
+    b = color + b + END
+    if i % 16 == 15:
+        return b + '\n'
+    else:
+        return b + ' '
 
 def process_byte(i, b):
     if b in bc:
         b = YEL + bc[b] + END
         if i % 16 == 15:
+            return b + '\n'
             print(b)
         else:
-            print(b, end=' ')
+            return b + ' '
     else:
         print("error")
+        print(hex(b))
         sys.exit()
     
 header_len = int.from_bytes(bytes_read[:8], byteorder=sys.byteorder, signed=True)
 
-print("header")
-for i in range(16):
-    print_byte(i, bytes_read[i], color=MAG)
-for i in range(16, header_len):
-    print_byte(i, bytes_read[i], color=GRN)
-        
-print("\nentry point")
+       
+main_bytes = []
+fns = []
+strs = []
 i = header_len
 while i < len(bytes_read):
-    process_byte(i - header_len, bytes_read[i])
+    if bytes_read[i] == 0x12:
+        fns.append(int.from_bytes(bytes_read[i+1:i+9], byteorder=sys.byteorder,signed=True))
+    if bytes_read[i] == 0xBB:
+        strs.append(int.from_bytes(bytes_read[i+1:i+9], byteorder=sys.byteorder,signed=True))
+    main_bytes.append(process_byte(i - header_len, bytes_read[i]))
     for j in range(arg.get(bytes_read[i], 0)):
         i += 1
-        print_byte(i - header_len, bytes_read[i])
+        main_bytes.append(print_byte(i - header_len, bytes_read[i]))
     i += 1
 
+header_bytes = []
+for i in range(16):
+    header_bytes.append(print_byte(i, bytes_read[i], color=MAG))
 
-print('\nend of bytecode')
+i = 16
+while i < header_len:
+    if i in strs:
+        str_len = int.from_bytes(bytes_read[i:i+8], byteorder=sys.byteorder,signed=True)
+        for j in range(8):
+            header_bytes.append(print_byte(i, bytes_read[i], color=GRN))
+            i += 1
+        for j in range(str_len):
+            header_bytes.append(print_char(i, bytes_read[i]))
+            i += 1
+    elif i in fns:
+        print(hex(i))
+        header_bytes.append(print_byte(i, bytes_read[i], color=RED))
+        i += 1
+    else:
+        header_bytes.append(print_byte(i, bytes_read[i], color=RED))
+        i += 1
+
+print("header")
+print(''.join(header_bytes))
+print("entry point")
+print(''.join(main_bytes))
+print('end of bytecode')
